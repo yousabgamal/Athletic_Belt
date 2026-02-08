@@ -5,8 +5,8 @@ float accX = 0.0 , accY = 0.0 , accZ = 0.0 , Temp_Val = 0.0 , Heart_Rate = 0.0 ;
 uint8 SPo2_Ratio = 0;
 uint16 GSR_Val = 0;
 
-const char* ssid = "TEdata8EE9AE";
-const char* password = "20951230";
+const char* ssid = "";
+const char* password = "";
 
 WebSocketsClient webSocket;
 
@@ -74,7 +74,7 @@ void setup() {
   }
   Serial.println("\n Connected.");
 
-  webSocket.beginSSL("vitalink20251014200825.azurewebsites.net", 443, "/sensorhub");
+  webSocket.beginSSL("", , "");
   webSocket.onEvent(webSocketEvent);
   xTaskCreatePinnedToCore(
   HeartRateTask,       
@@ -96,7 +96,7 @@ void webSocketEvent(WStype_t type, uint8 * payload, size_t length)
       break;
 
     case WStype_TEXT:
-      Serial.printf("📩 Message: %s\n", payload);
+      Serial.printf(" Message: %s\n", payload);
       if (strstr((char*)payload, "{}") || strstr((char*)payload, "{\"type\":1}")) 
       {
         handshakeDone = true;
@@ -142,7 +142,8 @@ void loop() {
     String msg = "{\"type\":1,\"target\":\"SendSensorData\",\"arguments\":[" + json + "]}\x1e";
     webSocket.sendTXT(msg);
 
-    Serial.println("📡 Sent data: " + json);
+    Serial.println(" Sent data: " + json);
   }
 }
+
 
