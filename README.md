@@ -42,7 +42,7 @@ All sensors are connected to and controlled by the **ESP32-S3**, which reads, pr
 - Measures body temperature accurately
 
 ### MPU6050 – Motion Sensor
-- Accelerometer + Gyroscope
+- Accelerometer
 - Measures acceleration and motion
 - Tracks athlete movement and activity
 
@@ -53,5 +53,10 @@ All sensors are connected to and controlled by the **ESP32-S3**, which reads, pr
 - Ready for wireless/cloud integration
 
 ---
+
+## Setup & Usage
+1. Clone the repository:
+```bash
+git clone https://github.com/yousabgamal/Athletic_Belt.git
 
 
