@@ -17,48 +17,14 @@ static Adafruit_MPU6050 Acceleration_Sensor_Obj;
 static const uint16 CAL_SAMPLES = 500;           
 static const float ALPHA = (float)0.15;             
 static const float DEADZONE = (float)0.08; 
-
 static float biasX = 0.0f, biasY = 0.0f, biasZ = 0.0f;
 static float filtX = 0.0f, filtY = 0.0f, filtZ = 0.0f;
 
-/**
- * @brief A helper fun to get the bais to be subtracted in the following code
- */
-static void calibrateSensor(void)
-{
-    double sumX = 0.0, sumY = 0.0, sumZ = 0.0;
-    for(int i = 0; i < CAL_SAMPLES; ++i)
-    {
-        sensors_event_t a, g, temp;
-        Acceleration_Sensor_Obj.getEvent(&a, &g, &temp);
-        sumX += a.acceleration.x;
-        sumY += a.acceleration.y;
-        sumZ += a.acceleration.z;
-        delay(5); 
-    }
-    biasX = (float)(sumX / CAL_SAMPLES);
-    biasY = (float)(sumY / CAL_SAMPLES);
-    biasZ = (float)(sumZ / CAL_SAMPLES);
-    filtX = filtY = filtZ = (float)0.0;
-}
+static float HR_MAX = 198.0f , HR_Normal = 0.0f , Temp_Normal = 0.0f;
+static uint16 GSR_Normal , MAX_GSR , MIN_GSR;
 
-/**
- * @brief A helper fun to clean the small noise(Filtration) from the sensor
- * @param Value Any value under it will be ignored
- * @return float 
- */
-static float deadzoneZero(float Value)
-{
-    if(fabs(Value) < DEADZONE)
-    {
-        Value = 0.0;
-    }
-    else
-    {
-        /*Nothing*/
-    }
-    return Value;
-}
+static void calibrateSensor(void);
+static float deadzoneZero(float Value);
 
 /**
  * @brief A function to define the speed of transition and initialize the I2C communication
@@ -69,9 +35,17 @@ void Initialize_Communication(uint32 bps)
     Serial.begin(bps);
     Wire.begin(SDA_MAX30100_AND_MPU650_SENSOR_PIN , SCL_MAX30100_AND_MPU650_SENSOR_PIN);
     Wire.setClock(100000); 
+    while(!(Wire.begin(SDA_MAX30100_AND_MPU650_SENSOR_PIN , SCL_MAX30100_AND_MPU650_SENSOR_PIN)))
+    {
+        //Bloking the code until the I2C communication is initialized successfully
+    }
     Wire1.begin(SDA_MLX90614_SENSOR_PIN , SCL_MLX90614_SENSOR_PIN);
+    while(!(Wire1.begin(SDA_MLX90614_SENSOR_PIN , SCL_MLX90614_SENSOR_PIN)))
+    {
+        //Bloking the code until the I2C communication is initialized successfully
+    }
     Wire1.setClock(50000);
-    delay(100);
+    //delay(100);
 }
 
 /**
@@ -110,13 +84,29 @@ bool Heart_Rate_And_SPo2_Sensor_Config(void)
  */
 void Get_Heart_Rate_And_SPo2_Ratio(float * Heart_Rate , uint8 * SPo2_Ratio)
 {
-    if(HeartRate_And_SPo2_Sensor_Obj.getHeartRate() < 60)
+    if(HeartRate_And_SPo2_Sensor_Obj.getHeartRate() < 40)
     {
         *(Heart_Rate) = 0;
     }
     else
     {
         *(Heart_Rate) = HeartRate_And_SPo2_Sensor_Obj.getHeartRate();
+        if(*(Heart_Rate) > 118.8)
+        {
+            if(HR_MAX == 198.0f)
+            {
+                HR_MAX = *(Heart_Rate);
+            }
+            else if(*(Heart_Rate) > HR_MAX)
+            {
+                HR_MAX = *(Heart_Rate);
+            }
+            else
+            {
+                /*Nothing*/
+            }
+        }
+        HR_Normal = *(Heart_Rate) / HR_MAX;
     }
     if(0 == (*(Heart_Rate)))
     {
@@ -125,6 +115,18 @@ void Get_Heart_Rate_And_SPo2_Ratio(float * Heart_Rate , uint8 * SPo2_Ratio)
     else
     {
         *(SPo2_Ratio) = (HeartRate_And_SPo2_Sensor_Obj.getSpO2() + 3);
+        if(0 == HeartRate_And_SPo2_Sensor_Obj.getSpO2())
+        {
+            *(SPo2_Ratio) = 0; 
+        }
+        else if(*(SPo2_Ratio) > 100)
+        {
+            *(SPo2_Ratio) = 100;
+        }
+        else
+        {
+            /*Nothing*/
+        }
     }
 }
 
@@ -159,6 +161,7 @@ void Get_Temperature_Sensor(float * Athletic_Temp)
     if((object_temp - ambient_temp) > 2.0)  
     {
         *(Athletic_Temp) = object_temp;
+        Temp_Normal = (*(Athletic_Temp) - 36) / 36; /*36 is the normal body temperature and 3.6 is the difference between the normal body temperature and the maximum body temperature*/
     }
     else
     {
@@ -223,5 +226,101 @@ void Get_Acceleration_Sensor(float * Final_x , float * Final_y , float * Final_z
  */
 void Get_Physical_Effort(uint16 * Physical_Effort)
 {
-    *(Physical_Effort) = analogRead(GSR_INPUT_SENSOR_PIN);
+    static uint8 First_Time_Check = 0;
+    static uint16 GSR_Value = 0;
+    static uint32 start_Time = 0;
+    static float Effort = 0.0f;
+    GSR_Value = analogRead(GSR_INPUT_SENSOR_PIN);
+    if(First_Time_Check == 0 && GSR_Value != 0)
+    {
+        MIN_GSR = GSR_Value;
+        MAX_GSR = GSR_Value;
+        start_Time = millis();    
+        while(millis() - start_Time < TEN_SECOND_CHECK)   
+        {
+            GSR_Value = analogRead(GSR_INPUT_SENSOR_PIN);
+            if(GSR_Value > MAX_GSR)
+            {
+                MAX_GSR = GSR_Value;
+            }
+            if(GSR_Value < MIN_GSR)
+            {
+                MIN_GSR = GSR_Value;
+            }
+        }
+        First_Time_Check = 1;
+    }
+    else
+    {
+        /*Nothing*/
+    }
+    if(GSR_Value > MAX_GSR)
+    {
+        MAX_GSR = GSR_Value;
+    }
+    else 
+    {
+        /*Nothing*/
+    }
+    if(MAX_GSR > MIN_GSR)
+    {
+        GSR_Normal = (float)(GSR_Value - MIN_GSR) / (float)(MAX_GSR - MIN_GSR);
+        if(GSR_Normal > 1)
+        {
+            GSR_Normal = 1;
+        }
+        else if(GSR_Normal < 0)
+        {
+            GSR_Normal = 0;
+        }
+        else
+        {
+            /*Nothing*/
+        }
+    }
+    else
+    {
+        GSR_Normal = 0;
+    }
+    Effort = (0.5f * HR_Normal) + (0.3f * GSR_Normal) + (0.2f * Temp_Normal);
+    *(Physical_Effort) = (uint16)(Effort * 100);
+}
+
+/**
+ * @brief A helper fun to get the bais to be subtracted in the following code
+ */
+static void calibrateSensor(void)
+{
+    double sumX = 0.0, sumY = 0.0, sumZ = 0.0;
+    for(int i = 0; i < CAL_SAMPLES; ++i)
+    {
+        sensors_event_t a, g, temp;
+        Acceleration_Sensor_Obj.getEvent(&a, &g, &temp);
+        sumX += a.acceleration.x;
+        sumY += a.acceleration.y;
+        sumZ += a.acceleration.z;
+        delay(5); 
+    }
+    biasX = (float)(sumX / CAL_SAMPLES);
+    biasY = (float)(sumY / CAL_SAMPLES);
+    biasZ = (float)(sumZ / CAL_SAMPLES);
+    filtX = filtY = filtZ = (float)0.0;
+}
+
+/**
+ * @brief A helper fun to clean the small noise(Filtration) from the sensor
+ * @param Value Any value under it will be ignored
+ * @return float 
+ */
+static float deadzoneZero(float Value)
+{
+    if(fabs(Value) < DEADZONE)
+    {
+        Value = 0.0;
+    }
+    else
+    {
+        /*Nothing*/
+    }
+    return Value;
 }
