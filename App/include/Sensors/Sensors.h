@@ -16,16 +16,13 @@
 
 /******************Section: Macros Declarations***********/
 #define ONE_SECOND_CHECK 1000
+#define TEN_SECOND_CHECK 10000
 
 /******************Section: Macros Functions Declarations*/
 
 /******************Section: Data Types Declarations*******/
 
 /******************Section: Functions Declarations********/
-
-static void calibrateSensor(void);
-static float deadzoneZero(float Value);
-
 void Initialize_Communication(uint32 bps);
 
 void Heart_Rate_And_SPo2_Sensor_Update(void);
