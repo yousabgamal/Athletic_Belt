@@ -1,12 +1,13 @@
 #include "main.h"
 
+const char* MY_BELT_ID = "Belt_ID";
 bool ret_val = true , handshakeDone = false;
 float accX = 0.0 , accY = 0.0 , accZ = 0.0 , Temp_Val = 0.0 , Heart_Rate = 0.0 ;
 uint8 SPo2_Ratio = 0;
 uint16 GSR_Val = 0;
 
-const char* ssid = "";
-const char* password = "";
+const char* ssid = "Network_Name";
+const char* password = "N******_P******";
 
 WebSocketsClient webSocket;
 
@@ -74,7 +75,7 @@ void setup() {
   }
   Serial.println("\n Connected.");
 
-  webSocket.beginSSL("", , "");
+  webSocket.beginSSL("Server_Name", Port_Number , "Endpoint");
   webSocket.onEvent(webSocketEvent);
   xTaskCreatePinnedToCore(
   HeartRateTask,       
@@ -90,7 +91,7 @@ void webSocketEvent(WStype_t type, uint8 * payload, size_t length)
 { 
   switch (type)
   {
-    case WStype_CONNECTED:
+    case WStype_CONNECTED:// When the connection is established
       Serial.println(" Connected to SignalR Hub.");
       webSocket.sendTXT("{\"protocol\":\"json\",\"version\":1}\x1e");
       break;
@@ -125,8 +126,9 @@ void loop() {
     }
     Get_Heart_Rate_And_SPo2_Ratio(&Heart_Rate , &SPo2_Ratio);
     Get_Physical_Effort(&GSR_Val);
-
+    
     JsonDocument doc;
+    doc["BeltID"] = MY_BELT_ID;        
     doc["heartRate"] = Heart_Rate;
     doc["spo2"] = SPo2_Ratio;
     doc["temperature"] = Temp_Val;
@@ -145,5 +147,4 @@ void loop() {
     Serial.println(" Sent data: " + json);
   }
 }
-
 
